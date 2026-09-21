@@ -1,0 +1,53 @@
+||1||||||2|||||3||||||4||
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+|POWER||JP1|||JP2||BOOT MODE|||||||||||ANT||
+|BATTERY||1 2|BATTERY|VBAT||1 2|GN D|||||||||||PA8||
+|||||||||SW1||||||||||||
+|GND|F1||||||R21 BOOT0||||PB2|||||||R18 2K||
+|VBAT||||SS14|||VDD 10K||||||R24 10K|||||LED1||
+|||||||VDD||||||||||||||
+||MF-NSMF050-2||500mA|D1|||MSS22D-18G2-2P2T-H2MM VDD|||PB5||GND|1K R22|||||GREEN GND T1 PMOS||
+|R9 10K|R10 10K|R1 10K|R2 10K|||R7 4.7K|R8 R3 R4 R19 10K 10K 10K 10K||1K|||||||R25||100K VDD||
+||PA2 D3|PA3 D4|PB6|PB7||PB3|PB4 PA9 PA10 PA13 D5 D6||R5|||||L1||4.7uH||/SWPA3015S4R7MT||
+|ESD7951ST5G GND PA8||PA8-I|ESD7951ST5G||PB14R13 0Ω||ESD7951ST5G ESD7951ST5G GND PB14-I||||R6 10M||C5 100uF,10V GND||1uF|16V C6||1N5819 D2||
+|R11 0Ω||10K C2 R12||100pF||10V|10M 100pF 10V C1 R14||Q8 G|D|S|1 2|U2 EN FB EXT VDD|6 5||GND||C10 3M R16 1nF||
+|||||GND||R15 12Ω|PA1 PA14 R20 10K GND GND|||BSS13G8N-D7-F||3|GND LX RT9266|4|||GND|R17 1M||
+||1|||12||||||||||||||||
+|PA0|2|||11||+5V|D|||||||||||||
+|PA1|3|||10|||GN|||||||||||||
+|PA2|4|||9||PA8||||||||||||||
+|PA3|5|||8||PA13||||||||||||||
+|PB6|6|||7||PB14||||||||||||||
+|PB7|7|||6||PB15||||||||||||||
+|PB3|8|||5||PB12||||||||||||||
+|PB4|9|||4||PB13||||||||||||||
+|PA9|10|||3||PA14||||||||||||||
+|D PA 10|1112|||||D_N||||||||||||||
+|GN||||12||D_P||||||||||||||
+|VDD||||||NRST||||||||||||||
+||JP3|||JP4||||||||||||||||
+||1||||||2|||||3||||||4||
+
+|5|||6|
+|---|---|---|---|
+|||NRST RESET||
+|||NRST||
+||A0 B0|A1 A0 A1 C7 B1 B0 B1 0.1uF|10V|
+|||GND||
+|||6 7||
+|D GN PA0 PA1 PA4 NRST PB2 +5V|6775 65 63 5671 5437|GND +3V3 AD P PA0 +3V3 PA1 PA2/USART2_TX GND PA3/USART2_RX PA4 PB6/I2C1_SCL GND PB7/I2C1_SDA RST BOOT0 PB2 PB5 PB3 PB4 PA9/USART1_TX|7724 VDD 70 PA2 68 PA3 PB6 5680 PBBO7OT0 4580 PB5 36 PB3 34 PB4 32 PA9|
+|C11 10uF，10V D_N D_P|35 1|PA10/USART1P_AR8X GND PA13/SWDIO PB14/I2S2_MCK PPBB1125//II22SS22__WSSD PB13/I2S2_CK PA11/USB_DM PA14/SWCLK PA12/USB_DP +3V3 GND +3V3|22 20 PA10 18 PA8-I D 16 GN 14 PA13 12 PB14-I 10 PB15 PB12 8 PB13 PA14 46 2 VDD|
+|GND||U1 NGFF_M2_KEY_E_SHIELD||
+|5|||6|
+
+SWITCH
+
+A A
+
+B B
+
+C4 100uF,10V
+
+C C
+
+D D

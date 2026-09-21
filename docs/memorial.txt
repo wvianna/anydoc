@@ -1,0 +1,1360 @@
+===============================================================================
+MEMORIAL DESCRITIVO E TÉCNICO
+NÓ SENSOR LoRaWAN — PLATAFORMA DE REFERÊNCIA DRAGINO LSN50 / LoRa ST
+===============================================================================
+
+Arquivo.......: docs/memorial.txt
+Versão........: 1.0
+Data..........: 2026-09-21
+Finalidade....: Documento-base (memorial) para o desenvolvimento de um sistema
+                de dispositivo LoRaWAN próprio, tendo como referência técnica a
+                plataforma Dragino LSN50 / LoRa ST (hardware v2.0/v2.1).
+Status........: Linha de base técnica — congelada para consulta de engenharia.
+
+-------------------------------------------------------------------------------
+SUMÁRIO
+-------------------------------------------------------------------------------
+ 1. Objetivo e escopo
+ 2. Documentos de referência e rastreabilidade
+ 3. Visão geral do produto de referência
+ 4. Arquitetura do sistema
+ 5. Arquitetura de hardware
+    5.1  Microcontrolador
+    5.2  Transceptor LoRa
+    5.3  Mapa de pinos e função no firmware
+    5.4  Alimentação, proteções e circuito de potência (esquemático)
+    5.5  Jumpers, chaves e sinalização
+    5.6  Interfaces externas e conectividade
+ 6. Especificações elétricas e de rádio
+ 7. Especificações mecânicas e ambientais
+ 8. Modos de operação e payload de uplink
+    8.1  Regras gerais do payload
+    8.2  MOD=1 (padrão — I2C)
+    8.3  MOD=2 (distância)
+    8.4  MOD=3 (3 ADC + I2C)
+    8.5  MOD=4 (3 x DS18B20)
+    8.6  MOD=5 (peso / HX711)
+    8.7  MOD=6 (contagem)
+    8.8  Decodificação dos campos
+    8.9  Byte 7 — entrada digital, interrupção e modo de trabalho
+ 9. Sensores e interfaces suportadas
+10. Interface de comando AT
+    10.1  Porta serial e formato de resposta
+    10.2  Códigos de status
+    10.3  Tabela de comandos AT
+    10.4  Sequências típicas de comissionamento
+11. Configuração por downlink LoRaWAN
+12. Perfil LoRaWAN e planos de frequência
+    12.1  Modos de ativação e classes
+    12.2  Regiões, bandas e canais
+    12.3  Modo 8 canais (AT+CHE)
+13. Orçamento de energia e autonomia
+    13.1  Consumos medidos
+    13.2  Estratégia de economia
+    13.3  Bateria
+14. Firmware, toolchain e gravação
+15. Requisitos para o desenvolvimento do sistema próprio
+    15.1  Requisitos funcionais
+    15.2  Requisitos não funcionais
+    15.3  Arquitetura de software proposta
+    15.4  Modelo de dados / payload proprietário
+    15.5  Provisionamento e ciclo de vida dos segredos
+16. Plano de validação e ensaios
+17. Riscos, limitações e pontos de atenção
+18. Anexos
+    A. Mapa de pinos (vista de conector)
+    B. Tabela resumida de payloads
+    C. Decodificador de payload de referência
+    D. Códigos de erro
+    E. Glossário e abreviações
+
+===============================================================================
+ 1. OBJETIVO E ESCOPO
+===============================================================================
+
+1.1 Este memorial consolida as informações técnicas extraídas dos manuais e
+    esquemático da plataforma Dragino LSN50 / LoRa ST e as organiza como
+    especificação de linha de base para o desenvolvimento de um sistema de
+    dispositivo LoRaWAN (hardware + firmware + payload + provisionamento +
+    validação).
+
+1.2 Escopo coberto:
+    a) requisitos de hardware do nó sensor (MCU, rádio, alimentação,
+       interfaces de sensor e proteções);
+    b) especificação do protocolo de aplicação (formato do payload de uplink
+       e comandos de downlink);
+    c) interface de configuração local via UART/AT;
+    d) perfil LoRaWAN (ativação, classe, regiões, canais);
+    e) orçamento de energia e estratégia de autonomia;
+    f) cadeia de ferramentas, bootloader e processo de gravação;
+    g) critérios de testes e aceitação.
+
+1.3 Fora de escopo:
+    a) infraestrutura de gateway LoRaWAN e servidor de rede (a referência
+       assume TTN v3 / ChirpStack como servidor externo);
+    b) projeto mecânico de invólucro definitivo e certificação regulatória
+       (ANATEL/CE/FCC) — tratados apenas como requisitos derivados.
+
+1.4 Convenções de nomenclatura usadas neste documento:
+    - "nó" ou "dispositivo" = end device LoRaWAN;
+    - "estação base"/"gateway" = concentrador LoRaWAN;
+    - a expressão "nesta plataforma" refere-se ao LSN50 / LoRa ST v1.x-v2.1;
+    - a expressão "no sistema próprio" refere-se ao produto a desenvolver.
+
+===============================================================================
+ 2. DOCUMENTOS DE REFERÊNCIA E RASTREABILIDADE
+===============================================================================
+
+  [R1] LSN50 LoRaWAN Sensor Node User Manual — Document Version 1.7.4 /
+       Image Version v1.7.0 (Dragino Technology). 69 páginas.
+       Fonte: LSN50_LoRa_Sensor_Node_UserManual_v1.7.4.pdf
+
+  [R2] Dragino LoRa® AT Command Sets (For LSN50/LoRaST) — v1.6.3.
+       24 páginas. Fonte: DRAGINO_LSN50_AT_Commands_v1.6.3.pdf
+
+  [R3] Esquemático "LoRa ST Sensor Node v2.0.sch" (PDF vetorial).
+       Observação: extração textual sem preservação de posicionamento; os
+       valores de componente citados neste memorial a partir de [R3] devem
+       ser confirmados no PDF original antes de uso em fabricação.
+
+Referências externas indicadas nos manuais:
+  - Código-fonte de software:  https://github.com/dragino/LoRa_STM32
+  - Arquivos de hardware:      https://github.com/dragino/Lora  (pasta LSN50)
+  - Instruções de compilação:  wiki.dragino.com — Firmware Compile Instruction
+  - Decodificador TTN v3:      dragino.com/downloads/.../LSN50-LoRaST/
+                               Payload_decoder/
+  - Datasheet MCU:             ST STM32L072CZ datasheet
+
+CONVENÇÃO DE RASTREABILIDADE: todas as tabelas de payload, comandos AT e
+especificações elétricas deste documento devem ser rastreadas a [R1], [R2] ou
+[R3]. Itens marcados com "(confirmar em [R3])" advêm de extração imperfeita do
+esquemático. Itens marcados com "(a definir)" são lacunas a fechar no projeto.
+
+===============================================================================
+ 3. VISÃO GERAL DO PRODUTO DE REFERÊNCIA
+===============================================================================
+
+  O LSN50 é um nó sensor LoRaWAN de longo alcance, projetado para registro de
+  dados em campo (outdoor), alimentado por bateria primária Li/SOCl2, com
+  transmissão segura de dados de longo prazo. Derivado do módulo LoRa ST
+  (mesmo firmware e mesmo conjunto de comandos AT), é fornecido em versões de
+  frequência 433 / 868 / 915 MHz, invólucro à prova d'água (IP66/IP68 conforme
+  versão) e opções de prensa-cabo M12/M16/M20.
+
+  Características-chave:
+   - LoRaWAN 1.0.2 (especificação de rádio) com imagem de firmware
+     LoRaWAN 1.0.3 Classe A e Classe C;
+   - STM32L072CZT6 (Cortex-M0+, ultra-low-power) + SX1276/SX1278;
+   - bootloader pré-gravado em USART1/USART2;
+   - aquisição local de múltiplos sensores (ADC, I2C, OneWire, UART,
+     interrupção digital, célula de carga);
+   - configuração por comandos AT (UART local) ou por downlink LoRaWAN;
+   - hardware e software de código aberto (STM32Cube HAL).
+
+===============================================================================
+ 4. ARQUITETURA DO SISTEMA
+===============================================================================
+
+  Fluxo de dados de ponta a ponta:
+
+   [sensores externos]
+          |  (ADC / I2C / OneWire / UART / GPIO / célula de carga)
+          v
+   [nó sensor LSN50]  -- uplink LoRa (FPORT dedicado) -->  [gateway LoRaWAN]
+          ^                                                        |
+          |                                                        v
+          +--------- downlink de configuração --------  [servidor de rede]
+                                                                |
+                                                                v
+                                                   [aplicação / IoT server]
+                                                   (TTN v3, Datacake, etc.)
+
+  Ciclo de operação do nó (Classe A):
+   1. dorme (STOP mode) até expirar o intervalo de transmissão (AT+TDC);
+   2. acorda, energiza o trilho VDD (sempre ativo) e o trilho +5V
+      (habilitado somente durante a amostragem);
+   3. executa a sequência de amostragem dos sensores do modo de trabalho
+      configurado (AT+MOD);
+   4. monta o payload, transmite uplink e abre as duas janelas de recepção
+      (RX1/RX2) conforme a especificação LoRaWAN;
+   5. processa eventual downlink de configuração;
+   6. desliga o trilho +5V e retorna ao sono.
+
+  Processo de junção: por padrão em OTAA (AT+NJM=1), Classe A. O dispositivo
+  aceita ainda ABP (AT+NJM=0), necessário para operação com gateways de canal
+  único (ex.: LG01/LG02).
+
+===============================================================================
+ 5. ARQUITETURA DE HARDWARE
+===============================================================================
+
+ 5.1 MICROCONTROLADOR
+ ---------------------------------------------------------------------------
+  Modelo.................: STM32L072CZT6 (família STM32L0, ultra-low-power)
+  Núcleo.................: ARM Cortex-M0+ 32 bits RISC @ 32 MHz, com MPU
+  Memória FLASH..........: 192 KB
+  RAM....................: 20 KB
+  EEPROM de dados........: 6 KB
+  USB....................: USB 2.0 sem cristal (crystal-less)
+  Periféricos usados.....: I2C1, LPUART1/USART1, USART2, SPI2, USB, ADC 12 bits
+                           (3 canais), DAC 12 bits, GPIO
+
+ 5.2 TRANSCEPTOR LoRa
+ ---------------------------------------------------------------------------
+  Chip...................: SX1276 (banda HF) ou SX1278 (banda LF)
+  Modulações.............: LoRa, FSK, GFSK, MSK, GMSK, OOK
+  Faixas de operação.....: Banda 1 (HF): 862 – 1020 MHz
+                           Banda 2 (LF): 410 – 528 MHz
+  Link budget...........: até 168 dB
+  Sensibilidade.........: até -148 dBm
+  IIP3...................: -12,5 dBm
+  Potência de saída......: 20 dBm (100 mW, PA constante) / 14 dBm (PA de alta
+                           eficiência)
+  Taxa de bits...........: programável até 300 kbps
+  Corrente de RX.........: 10,3 mA (retenção de registradores 200 nA)
+  Resolução do sintetizador: 61 Hz
+  Faixa dinâmica de RSSI : 127 dB
+  Motor de pacotes.......: até 256 bytes com CRC
+
+  Seleção por versão de hardware (frequência):
+   Versão |  Chip   | Faixa de trabalho      | Melhor sintonia | Bandas
+   -------+---------+------------------------+-----------------+----------
+    433   | SX1278  | Band2 LF 410 – 525 MHz | 433 MHz         | CN470/EU433
+    868   | SX1276  | Band1 HF 862 – 1020 MHz| 868 MHz         | EU868
+    915   | SX1276  | Band1 HF 862 – 1020 MHz| 915 MHz         | AS923/AU915/
+          |         |                        |                 | KR920/US915
+
+ 5.3 MAPA DE PINOS E FUNÇÃO NO FIRMWARE
+ ---------------------------------------------------------------------------
+  O conector de expansão (30 vias) expõe diretamente os GPIO do MCU. As
+  funções atribuídas pela imagem de firmware de fábrica são:
+
+   Pino | Sinal       | Direção | Função na imagem LSN50
+   -----+-------------+---------+-------------------------------------------
+     1  | VDD (~2,9V) | OUT     | Alimentação direta da placa (sempre ativa)
+     2  | PA0         | I/O     | ADC1 (divisor com PB4 para sensor resistivo)
+     3  | PA1         | I/O     | ADC2
+     4  | PA2         | I/O     | UART_TXD (console AT / bootloader USART2)
+     5  | PA3         | I/O     | UART_RXD
+     6  | PB6         | I/O     | I2C1_SCL (SHT20/SHT31, BH1750)
+     7  | PB7         | I/O     | I2C1_SDA
+     8  | PB3         | I/O     | OneWire — DS18B20 #1 (pull-up 10k)
+     9  | PB4         | I/O     | Dreno do sensor resistivo (nível baixo na
+         |             |         | amostragem); controle de divisor
+    10  | PA9         | I/O     | OneWire — DS18B20 #2
+    11  | PA10        | I/O     | OneWire — DS18B20 #3
+    12  | GND         | —       | Terra
+    13  | VCC (~2,9V) | OUT     | Jumper de liga/desliga da placa
+    14  | Jumper      | —       | Liga/desliga (ON/OFF jumper)
+    15  | PA4         | I/O     | ADC3
+    16  | NRST        | IN      | Reset do MCU
+    17  | PA12        | I/O     | Entrada digital / seleção ISP-Flash
+    18  | PA11        | I/O     | USB_DM
+    19  | PA14        | I/O     | SWCLK (ST-Link)
+    20  | PB13        | I/O     | GPIO livre
+    21  | PB12        | I/O     | GPIO livre
+    22  | PB15        | I/O     | GPIO livre
+    23  | PB14        | I/O     | Interrupção digital (sensor de porta,
+         |             |         | sensor de contagem / PIR)
+    24  | PA13        | I/O     | SWDIO (ST-Link)
+    25  | PA8         | I/O     | LED1 — pisca a cada transmissão LoRa
+    26  | GND         | —       | Terra
+    27  | +5V         | OUT     | Saída 5 V com chaveamento; habilitada por
+         |             |         | PB5 — NÍVEL BAIXO = HABILITA,
+         |             |         | NÍVEL ALTO = DESABILITA
+    28  | LED1        | —       | Controlado por PA8
+    29  | SW1         | —       | BOOT MODE: Flash (trabalho) / ISP (gravação)
+    30  | NRST        | IN      | Reset do MCU
+
+  Notas:
+   a) Pinos com pull-up de 10 kΩ para VCC na versão de placa: PA2, PA3,
+      PB6, PB7, PB3, PA9, PA10.
+   b) PA12 apresenta nível lógico distinto conforme a posição da chave
+      ISP/Flash — usado como método de verificação da chave em campo.
+   c) O trilho +5V é o preferencial para alimentar sensores externos, por ser
+      desligado fora da janela de amostragem.
+
+ 5.4 ALIMENTAÇÃO, PROTEÇÕES E CIRCUITO DE POTÊNCIA (esquemático)
+ ---------------------------------------------------------------------------
+  Elementos identificados em [R3] (confirmar em [R3]):
+
+   Ref  | Componente / valor            | Função provável
+   -----+-------------------------------+------------------------------------
+   F1   | MF-NSMF050-2                  | Fusível rearmável PTC (500 mA)
+   D1   | SS14 (Schottky)               | Diodo série entre bateria e VDD
+   D2   | 1N5819                        | Retificação/proteção do conversor
+   U2   | RT9266                        | Conversor boost (step-up) para
+        |  + L1 = 4,7 µH SWPA3015S4R7MT | trilho de 5 V
+   Q8   | BSS138 (MOSFET)               | Chaveamento de trilho
+   T1   | PMOS                          | Chave de controle da saída +5 V
+        |                               | (habilitada por PB5)
+   LED1 | Verde + R18 2K                | Indicação de transmissão
+   ESDx | ESD7951ST5G (múltiplos)       | Proteção ESD por I/O (v2.1)
+   C5   | 100 µF / 10 V                 | Reservatório / supercapacitor
+   C4   | 100 µF / 10 V                 | Reservatório
+   C6   | 1 µF / 16 V                   | Desacoplamento
+   C11  | 10 µF / 10 V                  | Desacoplamento
+   R14  | 10 MΩ                         | Pull-up da linha de interrupção
+   R3,R4| 4,7 kΩ (v2.1) / 10 kΩ (v1,x-v2.0) | Pull-up OneWire DS18B20
+   SW1  | MSS22D-18G2-2P2T-H2MM         | Chave BOOT MODE (Flash/ISP)
+   JP1..JP4 | Header de 2 vias          | Pontos de medida / configuração;
+        |                               | JP2 = liga/desliga da alimentação
+
+  Arranjo de trilhos:
+   BATERIA (Li/SOCl2, 3,6 V nom.) → F1 → D1 → VDD (~2,5 a 3,3 V conforme
+   corrente e queda em D1) → VCC da placa.
+   Ausência de D1: se a bateria utilizada for < 3,3 V, D1 deve ser removida e
+   os dois pads curto-circuitados, eliminando a queda de tensão.
+
+ 5.5 JUMPERS, CHAVES E SINALIZAÇÃO
+ ---------------------------------------------------------------------------
+   JP2 (ON/OFF): colocar o jumper liga o dispositivo. Removendo-o, é possível
+                 inserir um multímetro em série e medir o consumo total do
+                 sistema (recomendado pelo fabricante ao integrar novo sensor).
+   SW1 (BOOT MODE):
+        - Flash: modo de trabalho. O firmware executa e o console UART
+          apresenta as mensagens de inicialização e debug.
+        - ISP: modo de gravação. Nenhum sinal é gerado, o LED não funciona e
+          o firmware não executa; o dispositivo fica pronto para receber
+          imagem via Flashloader.
+   Botão RESET: reinicia o MCU.
+   LED1: pisca (a) na inicialização em modo Flash e (b) a cada uplink enviado.
+
+ 5.6 INTERFACES EXTERNAS E CONECTIVIDADE
+ ---------------------------------------------------------------------------
+   - UART de console/AT/comandos........: 9600 bps, 8 bits, sem paridade,
+                                           1 stop bit, sem flow control;
+                                           acessível via adaptador USB-TTL.
+   - I2C (PB6/PB7)......................: SHT20, SHT31, BH1750 (3,3 V).
+   - OneWire (PB3, PA9, PA10)...........: até 3 x DS18B20.
+   - Entrada digital (PA12).............: leitura de nível.
+   - Interrupção digital (PB14).........: borda configurável (AT+INTMOD).
+   - UART de sensor (MOD=2).............: LiDAR TF-Mini Plus / TF-Luna.
+   - Interface de célula de carga.......: HX711 (MOD=5) — pinos definidos no
+                                           firmware (a confirmar no código).
+   - Gravação/debug.....................: ST-Link v2 em SWDIO (PA13) /
+                                           SWCLK (PA14) / NRST / GND; também
+                                           possível por UART (Flashloader).
+   - Antena.............................: versão v2.0 com antena externa
+                                           (conector SMA) + antena de mola
+                                           para avaliação.
+
+===============================================================================
+ 6. ESPECIFICAÇÕES ELÉTRICAS E DE RÁDIO
+===============================================================================
+
+ 6.1 Características DC do MCU
+     Tensão de alimentação..........: 2,1 V a 3,6 V
+     Temperatura de operação........: -40 °C a +85 °C
+     I/Os...........................: conforme datasheet STM32L072
+
+ 6.2 Consumo
+     STOP mode (MCU)................: 2,7 µA @ 3,3 V
+     Transmissão LoRa @ 20 dBm......: 125 mA
+     Transmissão LoRa @ 14 dBm......: 44 mA
+     Sono profundo do sistema (típ.) : ~5 µA (mínimo medido ~10 µA)
+     Corrente de trabalho da CPU....: ~8 mA (somar aos consumos de amostragem)
+
+ 6.3 Trilhos de saída
+     VDD............................: 2,5 a 3,3 V; SEMPRE ativo. Uso em sensor
+                                      externo somente se o consumo em repouso
+                                      do sensor for < 50 µA.
+     +5V............................: ativo apenas durante a amostragem.
+                                      Contínuo: máx. 600 mA
+                                      Pulsado : máx. 1 A
+                                      Tempo ligado controlado por AT+5VT
+                                      (padrão 500 ms).
+
+ 6.4 Faixa de medição dos ADC
+     0 a 3,3 V (referência interna do STM32). Para tensões superiores, usar
+     divisor resistivo. Exceder 3,3 V pode destruir o pino.
+
+ 6.5 Proteção de I/O
+     Diodos ESD7951ST5G por linha (a partir do hardware v2.1).
+     Fusível rearmável de 500 mA na entrada de bateria.
+
+===============================================================================
+ 7. ESPECIFICAÇÕES MECÂNICAS E AMBIENTAIS
+===============================================================================
+
+   Parâmetro                     | LSN50 (v1.x)      | LSN50 v2
+   ------------------------------+-------------------+----------------------
+   Dimensões do dispositivo      | 8,0 x 6,5 x 5,0 cm| 9,7 x 6,5 x 4,7 cm
+   Peso do dispositivo           | 137 g             | 150 g
+   Dimensões da embalagem (un.)  | 9 x 7 x 6 cm      | 14,0 x 8 x 5 cm
+   Peso da embalagem (un.)       | 160 g             | 180 g
+   Grau de proteção              | IP66              | IP68 (novo invólucro,
+                                 |                   | antena externa, "ear hook")
+   Faixa de temperatura          | -40 a +85 °C      | -40 a +85 °C
+   Opções de prensa-cabo         | M12 / M16 / M20 / sem furo (NH)
+   Antena                        | —                 | Externa + antena de mola
+                                 |                   | (avaliação)
+
+  Código de pedido: LSN50-XX-YY (v1.x) ou LSN50-v2-XX-YY-ZZ
+   XX = banda......: AS923 | AU915 | EU433 | EU868 | KR920 | US915 |
+                     IN865 | CN470
+   YY = furo.......: 12 | 16 | 20 (não disponível em v2) | NH
+   ZZ = bateria....: 4 = 4000 mAh | 8 = 8500 mAh (somente modelo v2)
+
+  Conteúdo da embalagem v2: nó sensor x1, antena externa x1, antena de mola
+  (para avaliação).
+
+===============================================================================
+ 8. MODOS DE OPERAÇÃO E PAYLOAD DE UPLINK
+===============================================================================
+
+ 8.1 REGRAS GERAIS
+ ---------------------------------------------------------------------------
+   - Modo de trabalho selecionado por AT+MOD=<n> (ou downlink 0x0A <aa>).
+   - Porta de aplicação padrão do uplink periódico: FPORT = 2.
+   - Intervalo de transmissão: AT+TDC (ms). Padrão 30000 ms na imagem; o
+     manual indica que, por padrão, o dispositivo envia uplink a cada
+     5 minutos (AT+TDC=300000).
+   - Ordem dos campos: big-endian (byte mais significativo primeiro).
+   - Alguns modos geram payload > 12 bytes. Nas bandas US915/AU915/AS923 o
+     DR0 admite no máximo 11 bytes; o servidor verá payload nulo se o nó
+     transmitir 12 bytes em DR0. Portanto, em DR0, limitar o payload a 11
+     bytes ou habilitar ADR / data rate superior.
+   - Todos os modos compartilham a mesma semântica de decodificação dos
+     campos individuais (item 8.8).
+
+ 8.2 MOD=1 (PADRÃO — I2C)                                      [R1 §2.3.1]
+ ---------------------------------------------------------------------------
+   Total: 11 bytes | FPORT = 2
+
+   Byte(s) | Tamanho | Campo
+   --------+---------+--------------------------------------------------------
+   1-2     | 2       | BAT (tensão da bateria, mV)
+   3-4     | 2       | Temperatura DS18B20
+   5-6     | 2       | ADC
+   7       | 1       | Digital in & Digital Interrupt (+ modo de trabalho)
+   8-9     | 2       | Temperatura/Saída — SHT20/SHT31 (temperatura) ou, desde
+           |         | v1.7.0, sensor de iluminação BH1750
+   10-11   | 2       | Umidade SHT20 (ou reservado, conforme sensor instalado)
+
+ 8.3 MOD=2 (DISTÂNCIA)                                         [R1 §2.3.2]
+ ---------------------------------------------------------------------------
+   Variante A — LIDAR-Lite V3HP ou sensor ultrassônico. Total: 11 bytes.
+
+   Byte(s) | Tamanho | Campo
+   --------+---------+--------------------------------------------------------
+   1-2     | 2       | BAT
+   3-4     | 2       | Temperatura DS18B20
+   5-6     | 2       | ADC
+   7       | 1       | Digital in & Digital Interrupt
+   8-9     | 2       | Distância (mm)
+   10-11   | 2       | Reservado
+
+   Variante B — TF-Mini Plus (UART) ou TF-Luna (UART). Total: 11 bytes.
+
+   Byte(s) | Tamanho | Campo
+   --------+---------+--------------------------------------------------------
+   1-2     | 2       | BAT
+   3-4     | 2       | Temperatura DS18B20
+   5       | 1       | Digital in & Digital Interrupt
+   6-7     | 2       | ADC
+   8-9     | 2       | Distância (mm)
+   10-11   | 2       | Intensidade de sinal do sensor de distância
+
+   Requisitos de hardware:
+    - TF-Mini Plus / TF-Luna: remover R3 e R4 para obter baixo consumo
+      (a partir do firmware v1.7.0).
+    - Sensor ultrassônico (ex.: DF-Robot SEN0208): usar firmware > 1.6.5 para
+      alimentar o sensor diretamente do nó com baixo consumo.
+    - Faixa útil do ultrassônico: 24 cm a 600 cm; exatidão ~1 cm.
+
+ 8.4 MOD=3 (3 ADC + I2C)                                       [R1 §2.3.3]
+ ---------------------------------------------------------------------------
+   Total: 12 bytes
+
+   Byte(s) | Tamanho | Campo
+   --------+---------+--------------------------------------------------------
+   1-2     | 2       | ADC1 (pino PA0)
+   3-4     | 2       | ADC2 (pino PA1)
+   5-6     | 2       | ADC3 (pino PA4)
+   7       | 1       | Digital in & Digital Interrupt
+   8-9     | 2       | Temperatura SHT20 / SHT31
+   10-11   | 2       | Umidade SHT20 / SHT31
+   12      | 1       | BAT
+
+   ATENÇÃO: 12 bytes > limite de 11 bytes do DR0 nas bandas de 915/923 MHz.
+
+ 8.5 MOD=4 (3 x DS18B20)                                       [R1 §2.3.4]
+ ---------------------------------------------------------------------------
+   Suportado a partir do firmware v1.6.1. Total: 11 bytes.
+
+   Byte(s) | Tamanho | Campo
+   --------+---------+--------------------------------------------------------
+   1-2     | 2       | BAT
+   3-4     | 2       | Temperatura 1 — DS18B20 em PB3
+   5-6     | 2       | ADC
+   7       | 1       | Digital in & Digital Interrupt
+   8-9     | 2       | Temperatura 2 — DS18B20 em PA9
+   10-11   | 2       | Temperatura 3 — DS18B20 em PA10
+
+   Requisito de hardware: para suportar as 2ª e 3ª sondas, R3 e R4 devem ser
+   alterados de 10 kΩ para 4,7 kΩ nas versões v1.x e v2.0. Na v2.1 já são
+   4,7 kΩ de fábrica.
+
+ 8.6 MOD=5 (PESO / HX711)                                      [R1 §2.3.5]
+ ---------------------------------------------------------------------------
+   Suportado a partir do firmware v1.6.2 (usar >= v1.6.5 para dispensar LDO
+   externo no HX711). Total: 11 bytes.
+
+   Byte(s) | Tamanho | Campo
+   --------+---------+--------------------------------------------------------
+   1-2     | 2       | BAT
+   3-4     | 2       | Temperatura DS18B20
+   5-6     | 2       | ADC
+   7       | 1       | Digital in & Digital Interrupt
+   8-9     | 2       | Peso (g) — ver calibração abaixo
+   10-11   | 2       | Reservado
+
+   Procedimento de calibração obrigatório para cada célula de carga:
+    a) Zero: sem carga sobre a célula, executar AT+WEIGRE.
+    b) Fator de escala: com peso conhecido, executar AT+WEIGAP=<valor> e
+       ajustar iterativamente até a resposta "Weight: xx g" coincidir com o
+       peso real. Valor padrão do fator: 400,0.
+
+ 8.7 MOD=6 (CONTAGEM)                                          [R1 §2.3.6]
+ ---------------------------------------------------------------------------
+   Suportado a partir do firmware v1.6.5. Total: 11 bytes.
+
+   Byte(s) | Tamanho | Campo
+   --------+---------+--------------------------------------------------------
+   1-2     | 2       | BAT
+   3-4     | 2       | Temperatura DS18B20
+   5-6     | 2       | ADC
+   7       | 1       | Digital in & Digital Interrupt
+   8-11    | 4       | Contador de eventos de interrupção (enviado a cada TDC)
+
+   LIMITAÇÃO CONHECIDA: a transmissão LoRa acopla no sensor de contagem (PIR),
+   incrementando o contador em +1 a cada uplink. Mitigações: trocar o sensor
+   por modelo imune a RF ou afastá-lo fisicamente do nó.
+
+ 8.8 DECODIFICAÇÃO DOS CAMPOS                                 [R1 §2.4]
+ ---------------------------------------------------------------------------
+   a) BAT (2 bytes): tensão em mV.
+      Ex.: 0x0B45 = 2885 mV; 0x0B49 = 2889 mV.
+
+   b) Temperatura DS18B20 (2 bytes, 16 bits com sinal), décimos de °C:
+      v = valor; se (v & 0xFC00) == 0 → T = v / 10 °C
+                        caso contrário → T = (v - 65536) / 10 °C
+      Ex.: 0x0105 = 26,1 °C ; 0xFF3F = -19,3 °C
+
+   c) ADC (2 bytes): tensão em mV. Ex.: 0x021F = 543 mV.
+
+   d) Entrada digital PA12: PA12 em nível alto → bit 0 do byte 7 = 1.
+
+   e) Interrupção digital PB14: usada para detectar bordas (porta magnética,
+      contador). No MOD=1, o bit 7 do byte 7 reflete o estado da porta:
+         porta = (bytes[6] & 0x80) ? "CLOSE" : "OPEN"
+      Existem sensores NA (normalmente aberto) e NF (normalmente fechado);
+      a conexão física é idêntica, mas a decodificação é invertida e deve ser
+      ajustada no decodificador do servidor.
+      Consumo adicional quando o sensor está fechado:
+         I = VCC / R14 = 3,0 V / 1 MΩ ≈ 0,3 µA (desprezível).
+
+   f) SHT20/SHT31 (2 bytes cada): ler o valor, converter para decimal e
+      dividir por 10.
+      Ex.: temperatura 0x0116 = 278 → 27,8 °C
+           umidade     0x0248 = 584 → 58,4 %RH
+
+   g) Distância — ultrassônico (2 bytes): valor em mm.
+      Ex.: 0x0C2D = 3117 mm = 311,7 cm
+
+   h) BH1750 (bytes 8-9, desde v1.7.0, em MOD=1): iluminação.
+
+   i) Sensor resistivo (ex.: sensor de óleo), usando PA0 + PB4:
+        R_sensor = V_PA0 × 10 kΩ / (VCC - V_PA0)
+      PB4 é colocado em nível baixo (0 V) a cada amostragem.
+      Ex.: ADC = 0x05DC = 900 mV, VCC = 2,9 V → R = 0,9 × 10 k / (2,9 - 0,9)
+      = 4,5 kΩ. Com resposta linear de 10 a 70 cm:
+        posição = 4,5 k / 10 k × (70 - 10) + 10 = 37 cm
+      Procedimento: soldar resistor de 10 kΩ entre PA0 e VCC; conectar os dois
+      fios do sensor entre PA0 e PB4.
+
+ 8.9 BYTE 7 — ENTRADA DIGITAL, INTERRUPÇÃO E MODO DE TRABALHO [R1 §2.4.12]
+ ---------------------------------------------------------------------------
+   O byte 7 ("Digital in & Digital Interrupt") carrega três informações:
+
+     bit 0 .......... entrada digital PA12 (1 = nível alto)
+     bit 7 .......... estado da interrupção PB14 (porta fechada/aberta)
+     bits 2 a 6 ..... modo de trabalho em vigor
+                      modo = (byte7 >> 2) & 0x1F
+                        0 → MOD1      3 → MOD4
+                        1 → MOD2      4 → MOD5
+                        2 → MOD3      5 → MOD6
+
+   Recomendação para o sistema próprio: manter este byte compatível com o
+   formato acima, para reuso de decodificadores existentes.
+
+===============================================================================
+ 9. SENSORES E INTERFACES SUPORTADAS
+===============================================================================
+
+   Sensor / dispositivo   | Interface | Modo    | Endereço/Pino | Observação
+   -----------------------+-----------+---------+---------------+------------
+   DS18B20 (1x)           | OneWire   | MOD1/2/3| PB3           | 10 kΩ pull-up
+   DS18B20 (até 3x)       | OneWire   | MOD4    | PB3, PA9,PA10 | R3/R4 = 4,7 kΩ
+   SHT20 / SHT31          | I2C       | MOD1/3  | PB6/PB7       | temp+umidade
+   BH1750                 | I2C       | MOD1    | PB6/PB7       | desde v1.7.0
+   Sensor resistivo/ADC   | ADC       | MOD1/2/3| PA0, PA1, PA4 | 0-3,3 V
+   Sensor de porta (reed) | Interrupção| MOD1   | PB14 + VCC    | AT+INTMOD=1
+   Sensor de contagem/PIR | Interrupção| MOD6   | PB14          | ver limitação
+   Sensor ultrassônico    | Pulso/UART| MOD2    | (pino de pulso)| 24-600 cm
+   LIDAR-Lite V3HP        | I2C       | MOD2    | PB6/PB7       |
+   TF-Mini Plus / TF-Luna | UART      | MOD2    | UART do sensor| remover R3/R4
+   Célula de carga HX711  | GPIO      | MOD5    | (a confirmar) | calibrar antes
+   Entrada digital seca   | GPIO      | qualquer| PA12          | nível lógico
+
+   Cadência de amostragem: definida pelo firmware por modo; a saída +5V
+   antecede a amostragem e é desligada após (ver AT+5VT).
+
+===============================================================================
+10. INTERFACE DE COMANDO AT
+===============================================================================
+
+10.1 PORTA SERIAL E FORMATO DE RESPOSTA
+ ---------------------------------------------------------------------------
+   Parâmetros: 9600 bps, 8 bits de dados, sem paridade, 1 stop bit, sem flow
+   control. Ao energizar, o dispositivo emite as informações de sistema
+   (versão de imagem, banda de frequência, DevEUI).
+
+   Sintaxe padrão: "AT+XXX", com quatro comportamentos:
+     AT+XXX?        → ajuda curta sobre o comando
+     AT+XXX         → executa o comando
+     AT+XXX=?       → lê o valor atual
+     AT+XXX=<valor> → define o valor
+
+   Formato de saída:  <value><CR><LF><CR><LF><Status>
+   O campo <value> só é retornado nos casos de ajuda (AT+XXX?) e leitura
+   (AT+XXX=?). Todo comando (exceto ATZ) retorna um status precedido e
+   seguido de <CR><LF>.
+
+   IMPORTANTE: algumas ferramentas de terminal não enviam <ENTER> ao acionar
+   o botão de envio, fazendo parecer que a entrada de comandos não funciona.
+   Configurar o terminal para sufixar "Enter" (CR ou CR+LF) em cada comando.
+
+10.2 CÓDIGOS DE STATUS
+ ---------------------------------------------------------------------------
+   OK ...................... comando executado sem erro
+   AT_ERROR ................ erro genérico
+   AT_PARAM_ERROR .......... parâmetro inválido
+   AT_BUSY_ERROR ........... rede LoRa ocupada / comando não concluído
+   AT_TEST_PARAM_OVERFLOW .. parâmetro longo demais
+   AT_NO_NETWORK_JOINED .... rede LoRaWAN ainda não foi ingressada
+   AT_RX_ERROR ............. erro de detecção durante a recepção do comando
+
+10.3 TABELA DE COMANDOS AT
+ ---------------------------------------------------------------------------
+   Legenda: "Padrão" = valor de fábrica/valor de exemplo documentado.
+
+   --- Identificação e configuração geral -------------------------------------
+   AT            | —             | Atenção; responde OK
+   AT?           | —             | Ajuda curta + ajuda de todos os comandos
+   ATZ           | —             | Reset do MCU (não retorna status). Emite bloco
+                 |               | com versão, banda, DevEUI e info Tx/Rx
+   AT+FDR        | —             | Reset de parâmetros para padrão de fábrica,
+                 |               | PRESERVANDO as chaves (Keys Reserve)
+   AT+VER=?      | 1.3 / EU868   | Retorna versão da imagem e banda
+   AT+CFG        | —             | Imprime todas as configurações
+   AT+TDC=?      | 30000         | Intervalo de transmissão em ms
+   AT+TDC=<ms>   | —             | Define o intervalo (ex.: 60000)
+
+   --- Chaves, IDs e EUIs -----------------------------------------------------
+   AT+APPEUI=?   | 00 b3 d5 7e f0 00 4d 34 | Application EUI (8 bytes hex)
+   AT+APPKEY=?   | (16 bytes)    | Application Key (16 bytes hex)
+   AT+APPSKEY=?  | (16 bytes)    | Application Session Key (16 bytes hex)
+   AT+DADDR=?    | A8 40 41 FF   | Device Address (4 bytes hex)
+   AT+DEUI=?     | 00 44 34 22 33 45 55 55 | Device EUI (8 bytes hex)
+   AT+NWKID=?    | a8 40 41 ff   | Network ID (4 bytes); alterável somente
+                 |               | após conexão bem-sucedida à rede
+   AT+NWKSKEY=?  | (16 bytes)    | Network Session Key (16 bytes hex)
+
+   --- Junção e envio de dados ------------------------------------------------
+   AT+CFM=?      | 0             | Modo de confirmação (0-1)
+   AT+CFS=?      | 0             | Status de confirmação do último AT+SEND (0-1)
+   AT+JOIN       | —             | Ingressa na rede LoRaWAN
+   AT+NJM=?      | 1             | Modo de junção (0: ABP, 1: OTAA)
+   AT+NJS=?      | 0             | Status de junção da rede
+   AT+RECV=?     | 0:            | Último dado recebido em formato bruto
+   AT+RECVB=?    | 2: 0010       | Último dado recebido em formato binário
+   AT+SEND=<port>:<texto>          | Envio de texto (ex.: AT+SEND=12:hello)
+   AT+SENDB=<port>:<hex>           | Envio hexadecimal (ex.: AT+SENDB=12:ab..)
+
+   --- Gerenciamento de rede LoRa ---------------------------------------------
+   AT+ADR=?      | 1             | Adaptive Data Rate (0: off, 1: on)
+   AT+CLASS=?    | A             | Classe LoRaWAN (somente A e C suportadas)
+   AT+DCS=?      | 1             | ETSI Duty Cycle (0: disable, 1: enable)
+                 |               | — somente para testes
+   AT+DR=?       | 5             | Data rate (0-7 = DR_X); só alterável com
+                 |               | ADR=0
+   AT+FCD=?      | 0             | Frame counter downlink
+   AT+FCU=?      | 0             | Frame counter uplink
+   AT+JN1DL=?    | 5000          | Join-accept delay 1 (ms)
+   AT+JN2DL=?    | 6000          | Join-accept delay 2 (ms)
+   AT+PNM=?      | 1             | Public Network Mode (0: off, 1: on)
+   AT+RX1DL=?    | 1000          | Delay da janela RX1 (ms)
+   AT+RX2DL=?    | 2000          | Delay da janela RX2 (ms)
+   AT+RX2DR=?    | 6 (exemplo)   | Data rate da janela RX2 (0-7)
+   AT+RX2FQ=?    | 434665000     | Frequência da janela RX2 (Hz)
+   AT+TXP=?      | 0             | Potência de transmissão: 0-5 (0 = MAX,
+                 |               | 5 = MIN, conforme LoRaWAN) ou 40=10 dBm,
+                 |               | 41=11 dBm, ..., 50=20 dBm (fora da spec)
+   AT+RSSI=?     | 0             | RSSI do último pacote recebido
+   AT+SNR=?      | 0             | SNR do último pacote recebido
+   AT+PORT=?     | 21 (exemplo)  | Porta de aplicação
+   AT+CHS=?      | 868100000     | Frequência (Hz) do modo de canal único
+   AT+CHE=?      | 1 (exemplo)   | Modo de 8 canais (só US915/AU915/CN470)
+
+   --- Sensores e aplicação ---------------------------------------------------
+   AT+MOD=?      | 1             | Modo de trabalho: 1=I2C, 2=distância,
+                 |               | 3=3ADC, 4=3xDS18B20, 5=peso
+   AT+INTMOD=?   | 1             | Gatilho da interrupção: 0=desabilitado,
+                 |               | 1=borda de subida ou descida, 2=descida,
+                 |               | 3=subida
+   AT+5VT=?      | 500           | Tempo (ms) de saída +5V ativa na
+                 |               | amostragem (ex.: AT+5VT=1000)
+   AT+WEIGAP=?   | 400.0         | Lê/define o fator de calibração de peso;
+                 |               | resposta ao definir: "Weight: xx g"
+   AT+WEIGRE      | —            | Zera a calibração (peso = 0 g)
+
+10.4 SEQUÊNCIAS TÍPICAS DE COMISSIONAMENTO
+ ---------------------------------------------------------------------------
+   a) ABP multicanal (gateway SX1301 / LG308):
+        Se o dispositivo NÃO ingressou na rede:
+           AT+FDR
+           AT+NJM=0
+           ATZ
+        Se o dispositivo JÁ ingressou na rede:
+           AT+NJM=0
+           ATZ
+
+   b) ABP canal único (gateway LG01/LG02, exemplo em 868,4 MHz):
+           AT+FDR                        (reset; preserva chaves)
+           AT+NJM=0                      (modo ABP)
+           AT+ADR=0                      (desliga o ADR)
+           AT+DR=5                       (use AT+DR=3 para a banda de 915)
+           AT+TDC=300000                 (intervalo de 5 minutos)
+           AT+CHS=868400000              (frequência de transmissão)
+           AT+DADDR=26 01 1A F1          (endereço do dispositivo)
+           ATZ                           (reinicia o MCU)
+        As chaves NETSKEY/APPSKEY e o DADDR devem coincidir entre o nó e o
+        servidor (TTN v3). No TTN v3, NETSKEY e APPSKEY são configuráveis na
+        página de configurações, mas o DevAddr é gerado pelo TTN — pode ser
+        alterado via CLI do TTN.
+
+   c) Modo 8 canais (US915/AU915/CN470):
+           AT+CHE=2
+           ATZ
+
+   d) Ativação OTAA (padrão de fábrica):
+        - inserir as chaves OTAA no servidor (AppEUI + AppKey, e o DevEUI do
+          adesivo do produto) ou gravar as chaves de servidor no nó via
+          AT+DEUI / AT+APPEUI / AT+APPKEY;
+        - colocar jumper em JP2 para energizar;
+        - o nó ingressa automaticamente e passa a enviar uplinks.
+
+===============================================================================
+11. CONFIGURAÇÃO POR DOWNLINK LoRaWAN
+===============================================================================
+
+   Os parâmetros de sensor podem ser alterados remotamente por downlink, sem
+   acesso físico:
+
+   Parâmetro                     | Payload de downlink | Equivalência AT
+   ------------------------------+---------------------+-------------------
+   Modo de trabalho              | 0x0A aa             | AT+MOD=aa
+   Gatilho da interrupção        | 0x06 00 00 0a       | AT+INTMOD=a
+                                 | (ex.: 0x06 000003)  |
+   Tempo da saída +5V            | 0x07 aa bb          | AT+5VT=0x(aabb)
+   Calibração de zero (peso)     | 0x08 01             | AT+WEIGRE
+   Fator de calibração (peso)    | 0x08 02 aa bb       | AT+WEIGAP=0x(aabb)/10
+
+   Observação: comandos "comuns" (intervalo de transmissão, reset) são
+   padronizados entre os sensores Dragino e documentados na wiki do
+   fabricante (End Device AT Commands and Downlink Commands, firmware v1.7.0).
+
+   Requisito para o sistema próprio: definir uma tabela de downlinks com
+   opcode de 1 byte, validação de faixa, aplicação em memória não volátil e
+   resposta confirmável (AT+CFM=1) para comandos críticos.
+
+===============================================================================
+12. PERFIL LoRaWAN E PLANOS DE FREQUÊNCIA
+===============================================================================
+
+12.1 MODOS DE ATIVAÇÃO E CLASSES
+ ---------------------------------------------------------------------------
+   Ativação..........: OTAA (padrão, AT+NJM=1) ou ABP (AT+NJM=0)
+   Classe............: A (padrão) e C suportadas; AT+CLASS=A|C
+   Especificação.....: imagem LoRaWAN 1.0.3 (rádio conforme 1.0.2)
+   ADR...............: habilitado por padrão (AT+ADR=1)
+   Modo de rede......: público por padrão (AT+PNM=1)
+   Duty cycle........: ETSI habilitado por padrão (AT+DCS=1)
+   Confirmação.......: AT+CFM=0 (uplinks sem confirmação) por padrão
+
+12.2 REGIÕES, BANDAS E CANAIS
+ ---------------------------------------------------------------------------
+   Bandas suportadas por imagem: CN470, EU433, KR920, US915, IN865, EU868,
+   AS923, AU915.
+
+   A escolha de banda é feita na gravação da imagem (build/preprocessor
+   symbols) e não por comando AT em campo: "para mudar de banda/região,
+   seguir as instruções de upgrade de imagem e escolher o arquivo de imagem
+   correspondente".
+
+   No TTN v3, a banda US915 opera com 8 canais de 125 kHz (SF7 a SF10 BW125:
+   903,9 / 904,1 / 904,3 / 904,5 / 904,7 / 904,9 / 905,1 / 905,3 MHz) e 1
+   canal de 500 kHz (904,6 MHz, SF8BW500).
+
+12.3 MODO 8 CANAIS (AT+CHE)
+ ---------------------------------------------------------------------------
+   Bandas US915/AU915/CN470 operam por padrão em 72 canais (ou 96, no caso do
+   CN470). Gateways de 8 canais e o processo de junção OTAA tornam-se lentos e
+   imprevisíveis quando o nó salta por todas as frequências.
+
+   Solução: AT+CHE=<n> seguido de ATZ, restringindo a máscara de canais.
+
+   Tabela US915 (125 kHz, DR4/5, MHz):
+     CHE | Canais   | Frequências
+     ----+----------+--------------------------------------------------------
+      0  | 0-63     | habilita todos
+      1  | 0-7      | 902,3 902,5 902,7 902,9 903,1 903,3 903,5 903,7
+      2  | 8-15     | 903,9 904,1 904,3 904,5 904,7 904,9 905,1 905,3
+      3  | 16-23    | 905,5 905,7 905,9 906,1 906,3 906,5 906,7 906,9
+      4  | 24-31    | 907,1 907,3 907,5 907,7 907,9 908,1 908,3 908,5
+      5  | 32-39    | 908,7 908,9 909,1 909,3 909,5 909,7 909,9 910,1
+      6  | 40-47    | 910,3 910,5 910,7 910,9 911,1 911,3 911,5 911,7
+      7  | 48-55    | 911,9 912,1 912,3 912,5 912,7 912,9 913,1 913,3
+      8  | 56-63    | 913,5 913,7 913,9 914,1 914,3 914,5 914,7 914,9
+     64-71 (500 kHz)| 903  904,6 906,2 907,8 909,4 911  912,6 914,2
+     Canais de 500 kHz estão sempre incluídos no processo OTAA.
+
+   Com AT+CHE=2: OTAA em canais 8-15 + 64-71; uplinks em canais 8-15.
+
+   Tabela AU915 (125 kHz, MHz):
+     CHE | Canais   | Frequências
+     ----+----------+--------------------------------------------------------
+      0  | 0-63     | habilita todos
+      1  | 0-7      | 915,2 915,4 915,6 915,8 916,0 916,2 916,4 916,6
+      2  | 8-15     | 916,8 917,0 917,2 917,4 917,6 917,8 918,0 918,2
+      3  | 16-23    | 918,4 918,6 918,8 919,0 919,2 919,4 919,6 919,8
+      4  | 24-31    | 920,0 920,2 920,4 920,6 920,8 921,0 921,2 921,4
+      5  | 32-39    | 921,6 921,8 922,0 922,2 922,4 922,6 922,8 923,0
+      6  | 40-47    | 923,2 923,4 923,6 923,8 924,0 924,2 924,4 924,6
+      7  | 48-55    | 924,8 925,0 925,2 925,4 925,6 925,8 926,0 926,2
+      8  | 56-63    | 926,4 926,6 926,8 927,0 927,2 927,4 927,6 927,8
+     64-71 (500 kHz)| 915,9 917,5 919,1 920,7 922,3 923,9 925,5 927,1
+
+   Tabela CN470 (125 kHz, MHz):
+     CHE | Canais   | Frequências
+     ----+----------+--------------------------------------------------------
+      0  | 80-95    | habilita
+      1  | 80-87    | 486,3 486,5 486,7 486,9 487,1 487,3 487,5 487,7
+      2  | 88-95    | 487,9 488,1 488,3 488,5 488,7 488,9 489,1 489,3
+
+===============================================================================
+13. ORÇAMENTO DE ENERGIA E AUTONOMIA
+===============================================================================
+
+13.1 CONSUMOS MEDIDOS
+ ---------------------------------------------------------------------------
+   Componente / estado                            | Corrente
+   -----------------------------------------------+-------------------------
+   MCU em STOP mode                               | 2,7 µA @ 3,3 V
+   Sistema em sono profundo (típico)              | ~5 µA (mín. medido 10 µA)
+   CPU em modo de trabalho                        | ~8 mA
+   LoRa TX @ 20 dBm                               | 125 mA
+   LoRa TX @ 14 dBm                                | 44 mA
+   LoRa RX                                        | 10,3 mA
+   Amostragem do sensor de óleo (200 µs)          | 0,3 mA
+   Amostragem do DS18B20 (750 ms)                 | 0,64 mA
+
+13.2 ESTRATÉGIA DE ECONOMIA
+ ---------------------------------------------------------------------------
+   - Uso intensivo do STOP mode entre ciclos (AT+TDC define o ciclo).
+   - Alimentação de sensores externos preferencialmente pelo trilho +5V, que
+     é ligado apenas durante a amostragem (AT+5VT controla a duração mínima).
+   - VDD é permanente: sensor alimentado por VDD deve consumir < 50 µA em
+     repouso, sob pena de inviabilizar a autonomia.
+   - Remoção dos pull-ups R3/R4 quando se usam sensores UART de baixo consumo
+     (TF-Mini Plus / TF-Luna).
+   - Combinação de energias no cálculo: sensor de óleo + DS18B20 ≈
+     751 ms @ 8,64 mA (considerando CPU em trabalho e as duas janelas RX
+     agrupadas).
+   - Ferramenta de análise de consumo do fabricante disponível (power
+     consumption tool).
+
+   Cenários de cálculo de vida útil citados no manual (intervalo de 15 min,
+   payload de 8 bytes):
+     - Baixo consumo: SF7, 125 kHz, 20 dBm.
+     - Alto consumo : SF10, 125 kHz, 20 dBm.
+   O resultado em anos deve ser interpretado com cautela: a autocarga da
+   bateria Li/SOCl2 é de até 2 % ao ano.
+
+13.3 BATERIA
+ ---------------------------------------------------------------------------
+   Tipo...............: Li/SOCl2 (lítio-tionil cloreto), NÃO recarregável,
+                        combinada com supercapacitor
+   Capacidade.........: 4000 mAh ou 8500 mAh (modelo v2)
+   Autodescarga.......: < 1 %/ano @ 25 °C (típico); < 2 %/ano na análise
+   Corrente contínua máx.: 130 mA
+   Corrente de pico.....: 2 A por 1 s
+   Autonomia declarada..: > 5 anos
+   Célula padrão........: ER18505 + supercapacitor, conector JST-XH-2P
+   Substituta aceita....: ER18505 ou equivalente, com saída entre 3,0 e 3,6 V
+
+   Nota de aplicação: a bateria Li-SOCl2 é projetada para corrente baixa e
+   período longo. Não é adequada a transmissões de alta corrente em intervalos
+   curtos. O período mínimo recomendado de transmissão é de 5 minutos;
+   intervalos menores reduzem a vida útil.
+   O supercapacitor permite uso mais frequente (períodos < 5 min), ampliando a
+   vida útil em aplicações de alta cadência.
+
+   Substituição da bateria: se a bateria escolhida for < 3,3 V, remover o
+   diodo D1 e curto-circuitar os dois pads, eliminando a queda de tensão entre
+   bateria e placa.
+
+===============================================================================
+14. FIRMWARE, TOOLCHAIN E GRAVAÇÃO
+===============================================================================
+
+14.1 CADEIA DE FERRAMENTAS
+ ---------------------------------------------------------------------------
+   IDE / compilador....: Keil MDK-ARM Version 5.24a
+   Projeto..............:
+     STM32CubeExpansion_LRWAN/Projects/Multi/Applications/LoRa/
+     DRAGINO-LRWAN(AT)/MDK-ARM/STM32L072CZ-Nucleo/Lora.uvprojx
+   Bibliotecas.........: STM32Cube HAL drivers (código aberto)
+   Seleção de banda.....: Preprocessor Symbols (ex.: trocar EU868 por US915)
+   Fluxo...............: abrir o projeto no Keil → ajustar a banda →
+                         compilar/build → gravar
+
+   Repositórios:
+     - software: https://github.com/dragino/LoRa_STM32/tree/master/
+                 STM32CubeExpansion_LRWAN
+     - hardware: https://github.com/dragino/Lora/tree/master/LSN50
+     - imagens (hex): dragino.com/downloads → LSN50-LoRaST/Firmware/LSN50.hex/
+     - decodificador TTN v3: dragino.com/downloads → LSN50-LoRaST/
+                             Payload_decoder/
+
+14.2 GRAVAÇÃO DE FIRMWARE (UPLOAD)
+ ---------------------------------------------------------------------------
+   Método A — via porta serial (Flashloader):
+     1. baixar o flash loader e os arquivos de imagem do LSN50;
+     2. posicionar SW1 em ISP;
+     3. abrir o flashloader, selecionar a porta COM correta e gravar;
+     4. reposicionar SW1 em Flash e pressionar RESET — o novo firmware passa
+        a executar.
+     Observação: em Windows 10, executar o flash loader em modo de
+     compatibilidade com Windows 7 se houver falhas.
+
+   Método B — via ST-Link v2 (SWD):
+     Ligação: GND↔GND, SWCLK↔PA14, SWDIO↔PA13, RST↔NRST.
+     1. instalar o driver ST-LINK e o ST-LINK Utility;
+     2. baixar os arquivos de imagem;
+     3. no ST-LINK Utility: File → Open File → selecionar a imagem;
+     4. clicar em "Program Verify";
+     5. o LED do adaptador pisca e a janela de download aparece — clicar em
+        Start para gravar.
+     Observação: se a conexão não for estabelecida, tentar trocar SWDIO e
+     SWCLK de posição (alguns ST-Link v2 têm serigrafia incorreta).
+
+14.3 REGRAS DE ATUALIZAÇÃO
+ ---------------------------------------------------------------------------
+   - A partir da imagem v1.3, o firmware exibe a versão durante o boot. Se a
+     versão não for exibida, a imagem é muito antiga.
+   - Executar SEMPRE AT+FDR após atualizar a imagem, para restaurar os
+     parâmetros de fábrica.
+   - Se a atualização for de uma imagem >= v1.3 para outra >= v1.3, as chaves
+     são preservadas por AT+FDR. Atualizações a partir de versões anteriores
+     (ex.: v1.2 → v1.3) podem apagar as chaves.
+
+14.4 HISTÓRICO DE VERSÕES (RESUMO)
+ ---------------------------------------------------------------------------
+   Manual        | Firmware | Marco principal
+   --------------+----------+------------------------------------------------
+   1.0  (2018-12-04)        | Release
+   1.2.3 (2019-04-01)       | Distinção ISP/Flash, fluxo de trabalho, FAQ chaves
+   1.5.1 (2019-04-19)       | Suporte a ultrassônico, downlink, Datacake
+   1.6.0 (2019-08-07)       | Modo 3ADC
+   1.6.1 (2019-09-18)       | 3 x DS18B20 (MOD4)
+   1.6.2 (2019-12-13)       | Sensor de porta, conector de bateria
+   1.6.3 (2019-12-31)       | Sensor de peso HX711; AT+WEIGAP / AT+WEIGRE
+   1.6.4 (2020-01-13)       | Novos comandos AT; hardware LSN50 v2.0
+   1.6.6 (2020-07-15)       | MOD=6 (contagem) na v1.6.5 do firmware
+   1.7.0 (2020-11-06)       | Atualização para firmware v1.7.0
+   1.7.1 (2020-12-05)       | Payload do modo de trabalho; sensor de iluminação
+   1.7.2 (2021-01-23)       | Correção de payload ADC MOD1/MOD2; boot mode
+   1.7.3 (2021-03-17)       | Hardware LSN50 v2.1
+   1.7.4 (2021-09-01)       | Migração para TTN v3; nota do modo 3 x DS18B20
+
+   Manual de comandos AT: v1.3 (AT+CHS/AT+CHE), v1.4 (AT+CFG, AT+RX1WTO,
+   AT+RX2WTO), v1.5 (AT+TXP estendido, AT+MOD), v1.5.1 (AT+INTMOD, AT+TXP),
+   v1.6.3 (AT+WEIGAP, AT+WEIGRE).
+
+   Histórico de hardware:
+     v1.2: adição de LED (piscar a cada TX), pinos PA4/PB13/NRST, saída 5V
+           controlada por PB5 (baixo = habilita).
+     v1.3: adição de PMOS para controle da saída 5V.
+     v2.0: novo invólucro, antena externa, IP68, ear hook.
+     v2.1: R14 = 1 MΩ; R3 e R4 = 4,7 kΩ (dispensa modificação para 3 DS18B20);
+           diodos ESD em cada I/O.
+
+===============================================================================
+15. REQUISITOS PARA O DESENVOLVIMENTO DO SISTEMA PRÓPRIO
+===============================================================================
+
+15.1 REQUISITOS FUNCIONAIS
+ ---------------------------------------------------------------------------
+   RF-01 Aquisição periódica de dados de sensores conforme modo configurado,
+         com cadência definida por parâmetro (equivalente a AT+TDC).
+   RF-02 Transmissão de uplink LoRaWAN Classe A com payload versionado.
+   RF-03 Configuração local por UART com conjunto de comandos AT documentado
+         e retrocompatível com o subconjunto usado na plataforma de referência.
+   RF-04 Configuração remota por downlink, com confirmação opcional.
+   RF-05 Persistência de parâmetros e contadores de frame em memória não
+         volátil (EEPROM interna de 6 KB disponível).
+   RF-06 Junção OTAA e fallback para ABP.
+   RF-07 Indicação local de estado (LED de transmissão e de boot).
+   RF-08 Suporte a modo de recuperação de fábrica preservando chaves.
+   RF-09 Suporte a pelo menos: ADC (3 canais), I2C, OneWire (3x DS18B20),
+         entrada digital, interrupção digital, sensor de distância e célula
+         de carga.
+   RF-10 Modo de contagem de eventos com envio de acumulado por ciclo.
+   RF-11 Registro de motivo do último reset e contador de reinicializações
+         (diagnóstico remoto).
+   RF-12 Telemetria de bateria em todo uplink.
+
+15.2 REQUISITOS NÃO FUNCIONAIS
+ ---------------------------------------------------------------------------
+   RNF-01 Autonomia >= 5 anos para ciclo de 15 min, SF7, payload 8 bytes,
+          bateria de 4000 mAh.
+   RNF-02 Consumo em sono <= 10 µA para o conjunto MCU + rádio + periféricos
+          (referência medida: 2,7 µA no MCU, ~5 µA no sistema).
+   RNF-03 Payload de uplink <= 11 bytes por padrão, para compatibilidade com
+          DR0 nas bandas de 915/923 MHz.
+   RNF-04 Operação entre -40 °C e +85 °C.
+   RNF-05 Invólucro com grau de proteção mínimo IP66.
+   RNF-06 Imunidade a ESD em todas as linhas de I/O expostas.
+   RNF-07 Cobertura de teste automatizado do decodificador de payload
+          (uplink) e do parser de downlink.
+   RNF-08 Documentação de firmware, protocolo e pinagem versionada junto ao
+          código.
+   RNF-09 Compatibilidade de banco de dados: os payloads decodificados devem
+          ser serializáveis em JSON com nomes estáveis de campo.
+   RNF-10 Rastreabilidade de firmware: versão legível por AT e presente no
+          primeiro uplink após o boot.
+
+15.3 ARQUITETURA DE SOFTWARE PROPOSTA
+ ---------------------------------------------------------------------------
+   Camadas:
+
+     app/                  → lógica de negócio (ciclo de amostragem, política
+                             de transmissão, calibrações)
+     sensor/               → drivers: adc, ds18b20 (OneWire), sht2x/bh1750
+                             (I2C), ultrasonic/tfmini (UART), hx711, gpio/int
+     payload/              → serialização (uplink) e desserialização
+                             (downlink), versionamento de formato, codecs
+     lorawan/              → pilha LoRaWAN (LoRaMac-node/STM32CubeExpansion
+                             LRWAN como base), região, classes, ADR
+     config/               → parâmetros persistentes, valores de fábrica,
+                             AT+FDR lógico
+     at/                   → parser de comandos AT e formatação de resposta
+     hal/                  → abstração STM32Cube HAL, clock, baixo consumo
+     boot/                 → bootloader, verificação de imagem, modo ISP
+
+   Máquina de estados do ciclo principal:
+     INIT → SLEEP → WAKE → SAMPLE → ENCODE → TX → RX1/RX2 → APPLY_DOWNLINK
+     → SLEEP
+     Estados de exceção: JOIN_FAIL (backoff exponencial), SENSOR_FAIL
+     (marca campos como inválidos e mantém uplink), LOW_BATTERY (reduz
+     cadência).
+
+   Requisito de interoperabilidade: manter o byte 7 e os multiplicadores de
+   escala dos campos compatíveis com a plataforma de referência, permitindo
+   reutilizar decodificadores já existentes em TTN v3, ChirpStack e Datacake.
+
+15.4 MODELO DE DADOS / PAYLOAD PROPRIETÁRIO
+ ---------------------------------------------------------------------------
+   Recomendação de formato versionado (v2 proposto):
+
+     byte 0        : versão do formato (0x02) | modo de trabalho (3 bits)
+     bytes 1-2     : BAT (mV)
+     bytes 3-4     : canal 1 (escala definida por modo)
+     bytes 5-6     : canal 2
+     byte  7       : flags (bit0 entrada digital, bit7 interrupção, bits 2-6
+                     modo — compatibilidade retroativa)
+     bytes 8-11    : payload estendido / contador / reservado
+
+   Regras:
+    - ordenação big-endian em todos os campos multibyte;
+    - todo campo inválido deve ser sinalizado por valor sentinela
+      documentado (ex.: 0xFFFF) e não por omissão;
+    - o modo de trabalho deve estar sempre presente no uplink, para que o
+      servidor interprete o payload sem depender de estado externo.
+
+15.5 PROVISIONAMENTO E CICLO DE VIDA DOS SEGREDOS
+ ---------------------------------------------------------------------------
+   - DevEUI: identidade única de fábrica, gravada em memória não volátil e
+     impressa em etiqueta física no produto (referência: etiqueta com DevEUI
+     do fabricante).
+   - AppEUI/JoinEUI: por aplicação/lote.
+   - AppKey (OTAA): por dispositivo, jamais reutilizada entre unidades.
+   - NETSKEY/APPSKEY/DADDR: usadas apenas em ABP; devem ser rotacionadas
+     quando o dispositivo sai de operação.
+   - Regra: AT+FDR deve preservar chaves (comportamento "Keys Reserve").
+   - Regra: a troca de imagem não deve alterar chaves em versões >= 1.3.
+   - Procedimento de produção: gravação de firmware → gravação de
+     DevEUI/AppKey → teste de junção em bancada → registro no servidor →
+     etiquetagem → lacre do invólucro.
+
+===============================================================================
+16. PLANO DE VALIDAÇÃO E ENSAIOS
+===============================================================================
+
+ 16.1 ENSAIOS DE BANCADA
+   T-B01 Boot e versão: o console em 9600 8N1 exibe versão, banda e DevEUI.
+   T-B02 AT+FDR restaura padrões e preserva chaves.
+   T-B03 AT+CFG lista todos os parâmetros e nenhum valor fica fora de faixa.
+   T-B04 Cada comando AT da tabela 10.3 aceita leitura (?=), escrita (=) e
+         ajuda (?), retornando o status documentado.
+   T-B05 Parâmetros inválidos retornam AT_PARAM_ERROR (não reiniciam o nó).
+   T-B06 Comandos sem junção retornam AT_NO_NETWORK_JOINED quando aplicável.
+   T-B07 ATZ reinicia o MCU e reconstrói o estado sem perder configuração.
+
+ 16.2 ENSAIOS DE PAYLOAD
+   T-P01 Para cada MOD (1 a 6), gerar uplink com valores conhecidos nos
+         sensores e validar byte a byte contra o decodificador.
+   T-P02 Valores negativos de temperatura (ex.: -19,3 °C) decodificados
+         corretamente.
+   T-P03 Verificar que o byte 7 reporta entrada digital, interrupção e modo.
+   T-P04 Comprimento do payload conferido contra o modo (8.2 a 8.7) e contra
+         o limite de DR0 (11 bytes).
+   T-P05 Calibração de peso: AT+WEIGRE + AT+WEIGAP convergem em ±1 g em
+         3 iterações com massa conhecida.
+   T-P06 Sensor resistivo: curva ADC → resistência → posição linear conferida
+         em 3 pontos.
+   T-P07 Fuzz do parser de downlink: payloads truncados ou fora de faixa não
+         travam o firmware e não corrompem a configuração.
+
+ 16.3 ENSAIOS DE RÁDIO E REDE
+   T-R01 Junção OTAA em bancada com gateway de 8 canais (AT+CHE=2).
+   T-R02 Junção ABP e envio com AT+SENDB em canal único (AT+CHS).
+   T-R03 Classe C: janela de recepção contínua e downlink assíncrono.
+   T-R04 ADR ligado e desligado; coerção de DR com ADR desligado.
+   T-R05 Medição de RSSI/SNR por AT+RSSI / AT+SNR vs. distância conhecida.
+   T-R06 Teste de alcance em campo aberto e em ambiente urbano.
+   T-R07 Recuperação após perda de rede: número de tentativas de junção e
+         comportamento de backoff.
+
+ 16.4 ENSAIOS DE ENERGIA E AMBIENTE
+   T-E01 Consumo em STOP mode medido com multímetro de >= 4,5 dígitos entre os
+         pinos do jumper de ON/OFF (referência: Victor VC86E).
+   T-E02 Consumo médio por ciclo (amostragem + TX + RX) em SF7 e SF10.
+   T-E03 Projeção de autonomia para ciclos de 15 min e de 5 min.
+   T-E04 Ensaio térmico em -40 °C e +85 °C (funcionalidade e consumo).
+   T-E05 Ensaio de estanqueidade do invólucro (IP66/IP68).
+   T-E06 Descarga ESD em linhas expostas sem perda permanente.
+
+ 16.5 CRITÉRIOS DE ACEITAÇÃO
+   - 100 % dos ensaios de bancada e payload aprovados;
+   - autonomia projetada >= 5 anos no cenário nominal (RNF-01);
+   - consumo em sono <= 10 µA (RNF-02);
+   - nenhuma falha de junção após 100 ciclos consecutivos em T-R01;
+   - decodificador e parser com cobertura de teste >= 90 % de ramos.
+
+===============================================================================
+17. RISCOS, LIMITAÇÕES E PONTOS DE ATENÇÃO
+===============================================================================
+
+   ID   | Risco / limitação                          | Mitigação
+   -----+--------------------------------------------+---------------------
+   R-01 | Payload > 11 bytes incompatível com DR0 em | Limitar payload a 11
+        | US915/AU915/AS923 (servidor vê payload      | bytes ou forçar ADR/DR
+        | nulo).                                     | >= 1 nesses planos.
+   R-02 | LoRa TX acopla no sensor de contagem (PIR), | Sensor imune a RF ou
+        | incrementando o contador a cada uplink.    | afastamento físico.
+   R-03 | Sensor alimentado por VDD (sempre ativo)   | Usar +5V; validar
+        | com consumo de repouso > 50 µA degrada a   | corrente em repouso
+        | autonomia.                                 | antes da integração.
+   R-04 | Bateria Li-SOCl2 inapropriada para picos de| Período mínimo de 5 min;
+        | corrente em ciclos curtos; queda de vida   | supercapacitor para alta
+        | útil.                                      | cadência.
+   R-05 | Autodescarga de até 2 %/ano torna         | Considerar no cálculo;
+        | projeções otimistas de vida útil (ex.:     | não anunciar autonomia
+        | "18 anos").                                | acima de ~5 anos sem
+        |                                            | evidência de ensaio.
+   R-06 | Jumping por 72 canais dificulta junção OTAA| Usar AT+CHE=2 em
+        | em gateways de 8 canais.                    | US915/AU915/CN470.
+   R-07 | Mudança de banda/região exige nova gravação| Planejar SKU por região
+        | de imagem (não é feito por AT).            | e travar a banda em
+        |                                            | produção.
+   R-08 | Atualização de firmware a partir de imagens | Sempre executar AT+FDR
+        | antigas pode apagar chaves.                | e revalidar chaves após
+        |                                            | o upgrade.
+   R-09 | Falha de gravação via UART com adaptadores  | Preferir ST-Link; testar
+        | USB-TTL de baixa qualidade (FT232 + chipset | com PCs/adaptadores
+        | Intel).                                    | alternativos.
+   R-10 | Sensores NA/NF invertem a semântica de porta| Documentar tipo do
+        | no decodificador.                          | sensor por instalação.
+   R-11 | Sem AT+WEIGAP/AT+WEIGRE não há leitura de  | Incluir etapa de
+        | peso confiável (calibração obrigatória).   | calibração no comissiona-
+        |                                            | mento de campo.
+   R-12 | Extração textual do esquemático [R3] sem   | Conferir valores de
+        | posicionamento pode induzir erro de        | componente no PDF
+        | leitura de componente.                     | original antes de
+        |                                            | fabricar.
+
+===============================================================================
+18. ANEXOS
+===============================================================================
+
+ANEXO A — MAPA DE PINOS (VISTA DE CONECTOR, 30 VIAS)
+ ---------------------------------------------------------------------------
+   Lado A                          | Lado B
+   --------------------------------+----------------------------------------
+    1 VDD (3V, OUT)                |  2 PA0   (ADC1)
+    3 PA1   (ADC2)                 |  4 PA2   (UART_TXD, pull-up 10k)
+    5 PA3   (UART_RXD, pull-up 10k)|  6 PB6   (I2C1_SCL, pull-up 10k)
+    7 PB7   (I2C1_SDA, pull-up 10k)|  8 PB3   (DS18B20 #1, pull-up 10k)
+    9 PB4   (dreno do divisor)     | 10 PA9   (DS18B20 #2, pull-up 10k)
+   11 PA10  (DS18B20 #3, pull-up)  | 12 GND
+   13 VCC (2,9V, OUT)              | 14 Jumper ON/OFF
+   15 PA4   (ADC3)                 | 16 NRST  (IN)
+   17 PA12  (entrada digital/ISP)  | 18 PA11  (USB_DM)
+   19 PA14  (SWCLK)                | 20 PB13
+   21 PB12                         | 22 PB15
+   23 PB14  (interrupção digital)  | 24 PA13  (SWDIO)
+   25 PA8   (LED1)                 | 26 GND
+   27 +5V   (OUT, chaveado por PB5)| 28 LED1
+   29 SW1   (BOOT MODE)            | 30 NRST  (IN)
+
+   (A numeração de 1 a 30 segue a tabela de definição de pinos do manual
+    [R1 §1.5]; o pareamento A/B acima é uma organização de leitura, não a
+    ordem física dos pinos do conector.)
+
+ANEXO B — TABELA RESUMIDA DE PAYLOADS (ordem dos campos)
+ ---------------------------------------------------------------------------
+   MOD | Total | FPORT | Sequência de campos (tamanho em bytes)
+   ----+-------+-------+----------------------------------------------------
+    1  |  11   |   2   | BAT(2) T-DS18B20(2) ADC(2) DIG(1) T-I2C(2) H-I2C(2)
+    2a |  11   |   2   | BAT(2) T-DS18B20(2) ADC(2) DIG(1) DIST(2) RES(2)
+    2b |  11   |   2   | BAT(2) T-DS18B20(2) DIG(1) ADC(2) DIST(2) SIG(2)
+    3  |  12   |   2   | ADC1(2) ADC2(2) ADC3(2) DIG(1) T-I2C(2) H-I2C(2) BAT(1)
+    4  |  11   |   2   | BAT(2) T1(2) ADC(2) DIG(1) T2(2) T3(2)
+    5  |  11   |   2   | BAT(2) T-DS18B20(2) ADC(2) DIG(1) PESO(2) RES(2)
+    6  |  11   |   2   | BAT(2) T-DS18B20(2) ADC(2) DIG(1) CONT(4)
+
+   T-DS18B20 e T-I2C = temperatura (escalas distintas: DS18B20 em décimos de
+   °C com sinal; I2C em décimos sem sinal). DIG = byte 7 conforme item 8.9.
+
+ANEXO C — DECODIFICADOR DE PAYLOAD DE REFERÊNCIA (pseudocódigo)
+ ---------------------------------------------------------------------------
+   Referência de decodificação para TTN v3 / ChirpStack. Ajustar ao modo
+   declarado no byte 7.
+
+   function decode(bytes):
+       b = bytes
+       out = {}
+
+       # bateria (mV)
+       out.battery_mv = (b[0] << 8) | b[1]
+
+       # byte 7 (índice 6): modo, entrada digital e interrupção
+       dig = b[6]
+       out.work_mode   = (dig >> 2) & 0x1F       # 0..5 => MOD1..MOD6
+       out.digital_in  = dig & 0x01              # PA12
+       out.door_state  = (dig & 0x80) ? "CLOSE" : "OPEN"   # PB14
+
+       # temperatura DS18B20 (16 bits com sinal, décimos de °C)
+       t = (b[2] << 8) | b[3]
+       out.temperature_c = (t & 0xFC00) ? ((t - 65536) / 10) : (t / 10)
+
+       switch out.work_mode:
+           case 0:  # MOD1
+               out.adc_mv   = (b[4] << 8) | b[5]
+               out.i2c_temp = ((b[7] << 8) | b[8]) / 10
+               out.i2c_hum  = ((b[9] << 8) | b[10]) / 10
+           case 1:  # MOD2
+               out.adc_mv   = (b[4] << 8) | b[5]
+               out.distance_mm = (b[7] << 8) | b[8]
+           case 2:  # MOD3 (12 bytes)
+               out.adc1_mv  = (b[0] << 8) | b[1]
+               out.adc2_mv  = (b[2] << 8) | b[3]
+               out.adc3_mv  = (b[4] << 8) | b[5]
+               out.i2c_temp = ((b[7] << 8) | b[8]) / 10
+               out.i2c_hum  = ((b[9] << 8) | b[10]) / 10
+               out.battery_pct = b[11]
+           case 3:  # MOD4
+               out.adc_mv = (b[4] << 8) | b[5]
+               out.temp2_c = ((b[7] << 8) | b[8])   # mesma regra com sinal
+               out.temp3_c = ((b[9] << 8) | b[10])
+           case 4:  # MOD5
+               out.adc_mv  = (b[4] << 8) | b[5]
+               out.weight_g = (b[7] << 8) | b[8]
+           case 5:  # MOD6
+               out.adc_mv   = (b[4] << 8) | b[5]
+               out.count    = (b[7] << 24) | (b[8] << 16) | (b[9] << 8) | b[10]
+
+       return out
+
+   NOTA IMPORTANTE: o firmware do fabricante corrigiu, na versão 1.7.2 do
+   manual, um erro de posição do campo ADC nos modos MOD1 e MOD2. Ao
+   integrar, confirmar a posição efetiva do ADC contra a imagem de firmware
+   em uso — em MOD1/MOD2 o ADC pode aparecer nos bytes 5-6 ou como primeiro
+   campo, conforme a variante. O campo de modo no byte 7 é o discriminador
+   seguro para selecionar a tabela de campos.
+
+ANEXO D — CÓDIGOS DE ERRO (RESUMO)
+ ---------------------------------------------------------------------------
+   OK                     | Sucesso
+   AT_ERROR               | Erro genérico
+   AT_PARAM_ERROR         | Parâmetro inválido (formato ou faixa)
+   AT_BUSY_ERROR          | Rede LoRaWAN ocupada / comando não concluído
+   AT_TEST_PARAM_OVERFLOW | Parâmetro excede o comprimento suportado
+   AT_NO_NETWORK_JOINED   | Não há junção ativa com a rede LoRaWAN
+   AT_RX_ERROR            | Erro na recepção do comando (framing)
+
+ANEXO E — GLOSSÁRIO E ABREVIAÇÕES
+ ---------------------------------------------------------------------------
+   ABP        Activation By Personalization — ativação por personalização
+   ADC        Analog-to-Digital Converter — conversor analógico-digital
+   ADR        Adaptive Data Rate — taxa de dados adaptativa
+   AT         Attention — conjunto de comandos de configuração do modem
+   BH1750     Sensor digital de iluminância (I2C)
+   CFS        Confirm Status — status de confirmação
+   DevEUI     Identificador único do dispositivo (8 bytes)
+   devAddr    Endereço do dispositivo na rede LoRaWAN (4 bytes)
+   DR         Data Rate — taxa de dados LoRaWAN (DR0..DR7)
+   DS18B20    Sensor digital de temperatura OneWire
+   duty cycle Ciclo de trabalho regulatório da faixa ISM
+   FPORT      Porta de aplicação LoRaWAN (0..223)
+   HX711      Amplificador de célula de carga de 24 bits
+   ISM        Industrial, Scientific and Medical — faixa de radiofrequência
+   IIP3       Intercept point de 3ª ordem
+   JoinEUI/   Identificadores de aplicação LoRaWAN
+   AppEUI
+   LPUART     Low-power UART do STM32
+   LSN50      LoRaWAN Sensor Node, modelo Dragino
+   LoRa       Modulação de espectro espalhado em chirp
+   LoRaWAN    Protocolo de rede de longo alcance sobre LoRa
+   MPU        Memory Protection Unit
+   OneWire    Barramento digital de 1 fio (Dallas/Maxim)
+   OTAA       Over-The-Air Activation — ativação por rede
+   PIR        Passive Infrared — sensor de presença infravermelho
+   PMOS       Transistor MOSFET de canal P
+   PTC        Positive Temperature Coefficient — fusível rearmável
+   RSSI       Received Signal Strength Indicator
+   SHT20/31   Sensores digitais de temperatura e umidade (I2C)
+   SNR        Signal-to-Noise Ratio
+   STOP mode  Modo de baixo consumo do STM32
+   SWD        Serial Wire Debug — interface de depuração ARM
+   TDC        Transmit Data Cycle — intervalo de transmissão
+   TF-Mini/TF-Luna  Sensores LiDAR de distância (UART)
+   TTN        The Things Network — servidor de rede LoRaWAN
+
+===============================================================================
+FIM DO DOCUMENTO
+===============================================================================

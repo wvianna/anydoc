@@ -1,0 +1,111 @@
+# ---------------------------------------------------------------------------
+# ATENCAO - leia antes de acrescentar regras
+#
+# Este repositorio versiona PROPOSITALMENTE os documentos de engenharia:
+#   - PDFs originais de fornecedor (manuais, datasheets, esquematicos)
+#   - Markdown convertido (.md) ao lado de cada original
+#   - Imagens de firmware (.hex)
+#   - Textos extraidos de paginas especificas
+#
+# Nao ignore *.pdf, *.hex ou *.txt em massa: eles sao a fonte da verdade do
+# acervo. O .md gerado e derivado e deve ser versionado junto, pois e o que
+# o agente le em vez do binario.
+# ---------------------------------------------------------------------------
+
+# Sistema operacional
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Editores e IDE
+.idea/
+*.swp
+*.swo
+*.sublime-workspace
+*~
+\#*\#
+
+# VS Code: ignora preferencias pessoais, preserva configuracao compartilhavel
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Node.js (CLI do anydoc e ferramentas de apoio)
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.npm/
+.yarn/
+
+# Python (scripts de apoio e analise de payload)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# ---------------------------------------------------------------------------
+# SEGREDOS - nunca versionar
+#
+# Chaves LoRaWAN identificam e autorizam o dispositivo na rede. AppKey
+# versionada permite clonar o no; NwkSKey e AppSKey versionadas permitem
+# forjar trafego. Nenhuma delas pode entrar no historico do Git.
+# ---------------------------------------------------------------------------
+.env
+.env.*
+secrets/
+keys/
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Chaves de servico das ferramentas deste repositorio (Firecrawl, NS LoRaWAN)
+api.txt
+*apikey*
+*_key.txt
+.firecrawl/
+firecrawl.config.*
+
+# Artefatos temporarios e de rascunho
+*.tmp
+*.bak
+*.orig
+*.rej
+~$*
+/tmp/
+/out/
+/scratch/
+
+# Artefatos de compilacao de firmware (Keil MDK e STM32CubeIDE)
+# As imagens .hex distribuiveis em FIRMWARE/ NAO sao ignoradas.
+*.o
+*.d
+*.crf
+*.dep
+*.lst
+*.lnp
+*.axf
+*.elf
+*.map
+*.su
+*.build_log.htm
+Objects/
+Listings/
+DebugConfig/
+RTE/
+Debug/
+Release/
+
+
+api.txt
+
