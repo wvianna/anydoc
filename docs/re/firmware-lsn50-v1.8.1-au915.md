@@ -8,7 +8,7 @@ Complementa (não substitui):
 | Documento | Papel |
 |---|---|
 | `docs/memorial.txt` | Memorial da plataforma de referência (hardware, AT, payloads, LoRaWAN) — base documental |
-| `docs/memorial-newdevice.md` | Especificação do **novo** produto (generalista, 24 V, TLV, LoRaWAN 1.0.4) |
+| `docs/memorial-newdevice.md` | Especificação funcional do **novo** dispositivo (generalista): conceito de operação, protocolo de aplicação, requisitos funcionais e não funcionais |
 | **este documento** | **O que a imagem v1.8.1 realmente faz** — endereços, estruturas, formatos, algoritmos |
 
 Convenção de confiança usada em todo o texto:
@@ -788,6 +788,10 @@ de escrita.
 ---
 
 ## 14. Guia para a recodificação (para o agente de IA)
+
+> Este capítulo descreve **como reproduzir o comportamento do binário analisado**. A especificação do
+> **novo** dispositivo — generalista, com requisitos funcionais e não funcionais, é o
+> `docs/memorial-newdevice.md`. Onde os dois divergirem sobre o produto novo, vale o memorial.
 
 ### 14.1 Arquitetura de módulos alvo
 
