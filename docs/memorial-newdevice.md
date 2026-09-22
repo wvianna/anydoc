@@ -1058,18 +1058,18 @@ sequenceDiagram
     participant HW as Entrada digital
     participant EXTI as Interrupcao
     participant CNT as Contador de 32 bits
-    participant LOOP as Laco principal
+    participant LACO as Laco principal
     participant MAC as Pilha de rede
 
     HW->>EXTI: borda detectada
     EXTI->>CNT: incrementa acumulado
-    EXTI->>LOOP: marca evento pendente
-    LOOP->>LOOP: compara estado com o ultimo registrado
+    EXTI->>LACO: marca evento pendente
+    LACO->>LACO: compara estado com o ultimo registrado
     alt estado mudou
-        LOOP->>LOOP: marca uplink por evento
+        LACO->>LACO: marca uplink por evento
     end
-    Note over LOOP,MAC: cadencia ou evento disparam o mesmo caminho de envio
-    LOOP->>MAC: payload com estado das entradas e acumulado
+    Note over LACO,MAC: cadencia ou evento disparam o mesmo caminho de envio
+    LACO->>MAC: payload com estado das entradas e acumulado
 ```
 
 O dispositivo usa **as duas vias**: interrupção por hardware alimenta os contadores (não perde pulsos curtos)
