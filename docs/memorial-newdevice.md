@@ -1055,11 +1055,11 @@ subida), com validação de faixa e aviso de que a alteração só tem efeito ap
 
 ```mermaid
 sequenceDiagram
-    participant HW as "Entrada digital"
-    participant EXTI as "Interrupcao"
-    participant CNT as "Contador de 32 bits"
-    participant LOOP as "Laco principal"
-    participant MAC as "Pilha de rede"
+    participant HW as Entrada digital
+    participant EXTI as Interrupcao
+    participant CNT as Contador de 32 bits
+    participant LOOP as Laco principal
+    participant MAC as Pilha de rede
 
     HW->>EXTI: borda detectada
     EXTI->>CNT: incrementa acumulado
